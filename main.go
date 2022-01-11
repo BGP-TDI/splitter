@@ -12,33 +12,37 @@ var (
 	opt_R bool
 )
 
-func split(ipbytes [16]byte, plen int, left bool) {
-	// print
-	ipaddr := netip.AddrFrom16(ipbytes)
-	ipprefix, err := ipaddr.Prefix(plen)
-	if err != nil { log.Fatal(err) }
-
-	switch {
-	case opt_L:
-		if left  { fmt.Println(ipprefix) }
-	case opt_R:
-		if !left { fmt.Println(ipprefix) }
-	default:
-		fmt.Println(ipprefix)
+func split(ipbytes [16]byte, plen int) {
+	if plen >= 48 {
+		return
 	}
 
-	if plen < 48 {
-		i := plen / 8
-		j := 7 - (plen % 8)
+	i := plen / 8
+	j := 7 - (plen % 8)
 
-		// set to 0
-		ipbytes[i] &= ^(1 << j)
-		split(ipbytes, plen+1, true)
-
-		// set to 1
-		ipbytes[i] |= (1 << j)
-		split(ipbytes, plen+1, false)
+	// set to 0
+	ipbL := ipbytes
+	ipbL[i] &= ^(1 << j)
+	prefixL, err := netip.AddrFrom16(ipbL).Prefix(plen+1)
+	if err != nil {
+		log.Fatal(err)
+	} else if opt_L || !opt_R {
+		fmt.Println(prefixL)
 	}
+
+	// set to 1
+	ipbR := ipbytes
+	ipbR[i] |= (1 << j)
+	prefixR, err := netip.AddrFrom16(ipbR).Prefix(plen+1)
+	if err != nil {
+		log.Fatal(err)
+	} else if !opt_L || opt_R {
+		fmt.Println(prefixR)
+	}
+
+	// recurse
+	split(ipbL, plen+1)
+	split(ipbR, plen+1)
 }
 
 func main() {
@@ -59,5 +63,5 @@ func main() {
 	ipbytes := ipaddr.As16()
 	plen := ipprefix.Bits()
 	// fmt.Printf("parsed: %s\nraw: %x / %d\n", ipprefix, ipbytes, plen)
-	split(ipbytes, plen, true)
+	split(ipbytes, plen)
 }
